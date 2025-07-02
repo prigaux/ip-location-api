@@ -1,4 +1,5 @@
 import path from 'path'
+import { EnvHttpProxyAgent } from 'undici'
 
 // export const DEBUG = process.argv.includes('debug')
 
@@ -275,3 +276,5 @@ export const getPostcodeDatabaseElement = (postcode) => {
 
 	return createPostcodeDatabase(postcode)
 }
+
+export const dispatcher = new EnvHttpProxyAgent();
