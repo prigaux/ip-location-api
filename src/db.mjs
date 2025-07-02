@@ -6,13 +6,12 @@ import { fileURLToPath } from 'url'
 import { createHash } from 'crypto'
 import { pipeline } from 'stream/promises'
 
-import axios from 'axios'
 import { parse } from '@fast-csv/parse'
 import { Address4, Address6 } from 'ip-address'
 import dayjs from 'dayjs'
 
 import { setting, consoleLog, consoleWarn } from './setting.mjs'
-import { getPostcodeDatabaseElement, getPostcodeDatabase, strToNum37, aton4, aton6, getSmallMemoryFile, numberToDir, countryCodeToNum, initPostcodeDatabase } from './utils.mjs'
+import { getPostcodeDatabaseElement, getPostcodeDatabase, strToNum37, aton4, aton6, getSmallMemoryFile, numberToDir, countryCodeToNum, initPostcodeDatabase, dispatcher } from './utils.mjs'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -106,16 +105,13 @@ const ipLocationDb = async (db) => {
 
 const _ipLocationDb = async (url) => {
 	var fileEnd = url.split('-').pop()
-	return axios({
-		method: 'get',
-		url: url,
-		responseType: 'stream'
-	}).then(res => {
+	return fetch(url, { dispatcher: dispatcher }).then(res => {
+		const zipReadStream = Readable.fromWeb(res.body)
 		return new Promise((resolve, reject) => {
 			var fileName = setting.ipLocationDb + '-Blocks-' + fileEnd
 			const ws = fsSync.createWriteStream(path.join(setting.tmpDataDir, fileName))
 			ws.write('network1,network2,cc\n')
-			res.data.pipe(ws)
+			zipReadStream.pipe(ws)
 			ws.on('finish', () => {
 				resolve(fileName)
 			})
@@ -126,7 +122,7 @@ const _ipLocationDb = async (url) => {
 
 const dbipLocation = async () => {
 	const address = "https://download.db-ip.com/free/dbip-city-lite-" + dayjs().format('YYYY-MM') + ".csv.gz"
-	const res = await fetch(address)
+	const res = await fetch(address, { dispatcher: dispatcher })
 	const tmpFile = path.join(setting.tmpDataDir, 'dbip-city-lite.csv')
 	const ws = fsSync.createWriteStream(tmpFile)
 	await pipeline(res.body.pipeThrough(new DecompressionStream('gzip')), ws)
@@ -297,7 +293,7 @@ const downloadZip = async () => {
 		url = 'https://raw.githubusercontent.com/sapics/node-geolite2-redist/master/redist/'
 		url += database.edition + '.' + database.suffix
 	}
-	var text = await (await fetch(url)).text()
+	var text = await (await fetch(url, { dispatcher: dispatcher })).text()
 	var reg = /\w{50,}/, r = reg.exec(text)
 	if(!r) {
 		return consoleWarn('Cannot download sha256')
@@ -330,8 +326,8 @@ const downloadZip = async () => {
 		url = 'https://raw.githubusercontent.com/sapics/node-geolite2-redist/master/redist/'
 		url += database.edition + '.' + database.suffix.replace('.sha256', '')
 	}
-	return fetch(url).then(res => {
-		let zipReadStream = Readable.fromWeb(res.body)
+	return fetch(url, { dispatcher: dispatcher }).then(res => {
+		const zipReadStream = Readable.fromWeb(res.body)
 		const dest = fsSync.createWriteStream(zipPath)
 		return new Promise((resolve, reject) => {
 			consoleLog('Decompressing', database.edition + '.zip')
