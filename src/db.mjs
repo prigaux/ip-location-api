@@ -6,7 +6,6 @@ import { fileURLToPath } from 'url'
 import { createHash } from 'crypto'
 import { pipeline } from 'stream/promises'
 
-import axios from 'axios'
 import { parse } from '@fast-csv/parse'
 import { Address4, Address6 } from 'ip-address'
 import dayjs from 'dayjs'
@@ -106,16 +105,13 @@ const ipLocationDb = async (db) => {
 
 const _ipLocationDb = async (url) => {
 	var fileEnd = url.split('-').pop()
-	return axios({
-		method: 'get',
-		url: url,
-		responseType: 'stream'
-	}).then(res => {
+	return fetch(url).then(res => {
+		const zipReadStream = Readable.fromWeb(res.body)
 		return new Promise((resolve, reject) => {
 			var fileName = setting.ipLocationDb + '-Blocks-' + fileEnd
 			const ws = fsSync.createWriteStream(path.join(setting.tmpDataDir, fileName))
 			ws.write('network1,network2,cc\n')
-			res.data.pipe(ws)
+			zipReadStream.pipe(ws)
 			ws.on('finish', () => {
 				resolve(fileName)
 			})
@@ -331,7 +327,7 @@ const downloadZip = async () => {
 		url += database.edition + '.' + database.suffix.replace('.sha256', '')
 	}
 	return fetch(url).then(res => {
-		let zipReadStream = Readable.fromWeb(res.body)
+		const zipReadStream = Readable.fromWeb(res.body)
 		const dest = fsSync.createWriteStream(zipPath)
 		return new Promise((resolve, reject) => {
 			consoleLog('Decompressing', database.edition + '.zip')
